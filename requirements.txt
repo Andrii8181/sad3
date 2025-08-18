@@ -1,0 +1,10 @@
+pandas==2.2.2
+numpy
+scipy
+statsmodels
+scikit-posthocs
+pingouin
+matplotlib
+python-docx
+openpyxl
+PyQt5
