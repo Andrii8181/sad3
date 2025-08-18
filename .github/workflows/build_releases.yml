@@ -1,0 +1,33 @@
+name: Build SAD Executable
+
+on:
+  workflow_dispatch:   # запуск вручну з GitHub Actions
+
+jobs:
+  build-win:
+    runs-on: windows-2022   # фіксована версія Windows
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'   # сумісна з pandas, PyQt5 та statsmodels
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pandas pyqt5 matplotlib scipy statsmodels python-docx openpyxl
+
+      - name: Build EXE
+        run: |
+          pyinstaller --onefile --noconsole --icon=icon.ico main.py
+        shell: cmd
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: SAD_Windows
+          path: dist/main.exe
