@@ -1,10 +1,11 @@
-pandas==2.2.2
+pandas
 numpy
 scipy
 statsmodels
+scikit-learn
 scikit-posthocs
-pingouin
 matplotlib
-python-docx
+seaborn
+pyqt5
 openpyxl
-PyQt5
+python-docx
