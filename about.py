@@ -1,25 +1,22 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton
 
-class AboutWindow(QDialog):
+class AboutDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Про програму")
+        self.setGeometry(300, 200, 400, 200)
 
         layout = QVBoxLayout()
-
         text = QLabel(
-            "<h2>SAD — Статистичний аналіз даних</h2>"
-            "<p>Програма для статистичного аналізу експериментальних даних "
-            "(нормальність, дисперсійний аналіз, порівняння середніх, "
-            "візуалізація результатів).</p>"
-            "<p><b>Розробник:</b> Чаплоуцький А.М.<br>"
-            "Кафедра плодівництва і виноградарства УНУ</p>"
-            "<p>© 2025 Усі права захищені.</p>"
+            "SAD – Статистичний аналіз даних\n\n"
+            "Розробник: Чаплоуцький А.М.\n"
+            "Кафедра плодівництва і виноградарства УНУ\n"
+            "Всі права захищені. Програма поширюється під академічною ліцензією.\n"
         )
         layout.addWidget(text)
 
-        close_button = QPushButton("Закрити")
-        close_button.clicked.connect(self.close)
-        layout.addWidget(close_button)
+        close_btn = QPushButton("Закрити")
+        close_btn.clicked.connect(self.close)
+        layout.addWidget(close_btn)
 
         self.setLayout(layout)
