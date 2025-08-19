@@ -2,10 +2,7 @@ pandas
 numpy
 scipy
 statsmodels
-pingouin
-scikit-posthocs
 matplotlib
-seaborn
-openpyxl
 python-docx
-pyqt5
+openpyxl
+PyQt5
