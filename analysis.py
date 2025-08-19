@@ -1,83 +1,112 @@
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QCheckBox, QLineEdit, QMessageBox
 import pandas as pd
-import numpy as np
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QPushButton, QListWidget, QMessageBox, QFileDialog
-)
-from scipy.stats import shapiro
-from statsmodels.stats.multicomp import pairwise_tukeyhsd
+from scipy import stats
+import statsmodels.api as sm
 import matplotlib.pyplot as plt
-from docx import Document
-import datetime
+import docx
+from datetime import datetime
 
 
 class AnalysisWindow(QDialog):
-    def __init__(self, data: pd.DataFrame):
+    def __init__(self, df):
         super().__init__()
-        self.data = data
+        self.df = df
         self.setWindowTitle("Аналіз даних")
+        self.setGeometry(250, 150, 400, 300)
 
         layout = QVBoxLayout()
 
-        self.label = QLabel("Оберіть метод(и) аналізу:")
-        layout.addWidget(self.label)
+        # Поля для назви показника і одиниць виміру
+        layout.addWidget(QLabel("Назва показника:"))
+        self.indicator_input = QLineEdit()
+        layout.addWidget(self.indicator_input)
 
-        self.listWidget = QListWidget()
-        self.listWidget.addItems([
-            "Перевірка нормальності (Шапіро-Вілка)",
-            "Однофакторний дисперсійний аналіз",
-            "Двофакторний дисперсійний аналіз",
-            "Багатофакторний дисперсійний аналіз",
-            "Дисперсійний аналіз з повторними вимірюваннями",
-            "НІР05",
-            "Тест Данканa",
-            "Тест Тьюкі",
-            "Тест Бонфероні",
-            "Квадратичне відхилення",
-            "Сила впливу факторів"
-        ])
-        self.listWidget.setSelectionMode(self.listWidget.MultiSelection)
-        layout.addWidget(self.listWidget)
+        layout.addWidget(QLabel("Одиниці виміру:"))
+        self.unit_input = QLineEdit()
+        layout.addWidget(self.unit_input)
 
-        self.runButton = QPushButton("Виконати аналіз")
-        self.runButton.clicked.connect(self.run_analysis)
-        layout.addWidget(self.runButton)
+        # Чекбокси для вибору аналізів
+        self.chk_anova = QCheckBox("Однофакторний дисперсійний аналіз (ANOVA)")
+        self.chk_ttest = QCheckBox("t-тест (Student)")
+        self.chk_median = QCheckBox("Медіанний тест (непараметричний)")
+        self.chk_graph = QCheckBox("Побудувати графік (середні значення)")
+
+        layout.addWidget(self.chk_anova)
+        layout.addWidget(self.chk_ttest)
+        layout.addWidget(self.chk_median)
+        layout.addWidget(self.chk_graph)
+
+        # Кнопка запуску
+        self.run_button = QPushButton("Виконати аналіз")
+        self.run_button.clicked.connect(self.run_analysis)
+        layout.addWidget(self.run_button)
 
         self.setLayout(layout)
 
     def run_analysis(self):
-        selected = [item.text() for item in self.listWidget.selectedItems()]
-        if not selected:
-            QMessageBox.warning(self, "Помилка", "Оберіть хоча б один метод аналізу")
-            return
+        results = []
+        numeric_df = self.df.apply(pd.to_numeric, errors="coerce").dropna()
 
-        # Створення Word-документу
-        doc = Document()
-        doc.add_heading("Результати статистичного аналізу", level=1)
+        # Перевірка на нормальність Шапіро–Вілка
+        w, pvalue = stats.shapiro(numeric_df.iloc[:, -1])
+        if pvalue < 0.05:
+            QMessageBox.warning(self, "Перевірка нормальності", 
+                                "Дані не відповідають нормальному розподілу!\n"
+                                "Рекомендується використовувати непараметричні методи.")
+        else:
+            QMessageBox.information(self, "Перевірка нормальності", "Дані відповідають нормальному розподілу.")
 
-        # Додаємо початкові дані
-        doc.add_heading("Початкові дані", level=2)
-        table = doc.add_table(rows=self.data.shape[0] + 1, cols=self.data.shape[1])
-        table.style = 'LightShading-Accent1'
-        # заголовки
-        for j, col in enumerate(self.data.columns):
-            table.cell(0, j).text = str(col)
-        # дані
-        for i in range(self.data.shape[0]):
-            for j in range(self.data.shape[1]):
-                table.cell(i + 1, j).text = str(self.data.iloc[i, j])
+        # Однофакторний ANOVA
+        if self.chk_anova.isChecked():
+            try:
+                groups = [numeric_df.iloc[:, -1]]
+                f_val, p_val = stats.f_oneway(*groups)
+                results.append(f"ANOVA: F = {f_val:.3f}, p = {p_val:.4f}")
+            except Exception as e:
+                results.append(f"ANOVA: помилка ({str(e)})")
 
-        doc.add_paragraph("Дата аналізу: " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        doc.add_paragraph("Програма: SAD — статистичний аналіз даних")
+        # T-тест
+        if self.chk_ttest.isChecked():
+            try:
+                sample1 = numeric_df.iloc[:, 0]
+                sample2 = numeric_df.iloc[:, 1]
+                t_val, p_val = stats.ttest_ind(sample1, sample2)
+                results.append(f"T-тест: t = {t_val:.3f}, p = {p_val:.4f}")
+            except Exception as e:
+                results.append(f"T-тест: помилка ({str(e)})")
 
-        # Приклад: якщо вибрали Шапіро
-        if "Перевірка нормальності (Шапіро-Вілка)" in selected:
-            doc.add_heading("Тест Шапіро-Вілка", level=2)
-            for col in self.data.select_dtypes(include=[np.number]).columns:
-                stat, p = shapiro(self.data[col].dropna())
-                doc.add_paragraph(f"{col}: W={stat:.3f}, p={p:.3f}")
+        # Медіанний тест
+        if self.chk_median.isChecked():
+            try:
+                stat, p_val, med, tbl = stats.median_test(*[numeric_df[col] for col in numeric_df.columns])
+                results.append(f"Медіанний тест: χ² = {stat:.3f}, p = {p_val:.4f}")
+            except Exception as e:
+                results.append(f"Медіанний тест: помилка ({str(e)})")
 
-        # Збереження документа
-        save_path, _ = QFileDialog.getSaveFileName(self, "Зберегти результати", "", "Word Files (*.docx)")
-        if save_path:
-            doc.save(save_path)
-            QMessageBox.information(self, "Готово", f"Результати збережено у {save_path}")
+        # Графік
+        if self.chk_graph.isChecked():
+            plt.figure()
+            numeric_df.mean().plot(kind="bar")
+            plt.title("Середні значення по факторах")
+            plt.savefig("results_plot.png")
+            plt.close()
+            results.append("Побудовано графік (results_plot.png)")
+
+        # Запис у Word
+        doc = docx.Document()
+        doc.add_heading(f"Аналіз даних – {self.indicator_input.text()}", 0)
+        doc.add_paragraph(f"Одиниці виміру: {self.unit_input.text()}")
+        doc.add_paragraph("Початкові дані:")
+        doc.add_table(rows=1, cols=len(self.df.columns))
+        for r in self.df.values.tolist():
+            row = doc.add_table(rows=1, cols=len(r)).rows[0].cells
+            for i, val in enumerate(r):
+                row[i].text = str(val)
+        doc.add_paragraph("Результати аналізу:")
+        for res in results:
+            doc.add_paragraph(res)
+        doc.add_paragraph(f"Дата аналізу: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+        doc.add_paragraph("Програма: SAD – Статистичний аналіз даних")
+        doc.save("results.docx")
+
+        QMessageBox.information(self, "Готово", "Аналіз завершено. Результати збережено у results.docx")
