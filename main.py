@@ -1,130 +1,165 @@
 import sys
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QAction, QFileDialog,
-    QMessageBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+    QApplication, QMainWindow, QTableWidget, QTableWidgetItem, QAction,
+    QFileDialog, QMessageBox
 )
+from PyQt5.QtCore import Qt
 import pandas as pd
 from analysis import AnalysisWindow
-from about import AboutWindow
+from about import AboutDialog
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("SAD — Статистичний аналіз даних")
-        self.resize(900, 600)
+        self.setWindowTitle("SAD – Статистичний аналіз даних")
+        self.setGeometry(200, 100, 900, 600)
 
-        # Початкова таблиця (5x5)
-        self.table = QTableWidget(5, 5)
+        # Таблиця для введення даних
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(3)
+        self.table.setRowCount(5)
+        self.table.setHorizontalHeaderLabels(["Фактор A", "Фактор B", "Результат"])
         self.setCentralWidget(self.table)
 
         # Меню
-        self.create_menu()
-
-    def create_menu(self):
         menubar = self.menuBar()
 
-        # Файл
         file_menu = menubar.addMenu("Файл")
-
-        load_action = QAction("Завантажити з Excel", self)
-        load_action.triggered.connect(self.load_from_excel)
-        file_menu.addAction(load_action)
-
-        save_action = QAction("Зберегти у Excel", self)
+        open_action = QAction("Відкрити з Excel", self)
+        open_action.triggered.connect(self.load_from_excel)
+        save_action = QAction("Зберегти в Excel", self)
         save_action.triggered.connect(self.save_to_excel)
+        file_menu.addAction(open_action)
         file_menu.addAction(save_action)
 
-        exit_action = QAction("Вихід", self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-
-        # Редагування
-        edit_menu = menubar.addMenu("Редагування")
-
+        edit_menu = menubar.addMenu("Редагувати")
         add_row_action = QAction("Додати рядок", self)
         add_row_action.triggered.connect(self.add_row)
+        del_row_action = QAction("Видалити рядок", self)
+        del_row_action.triggered.connect(self.delete_row)
+        add_col_action = QAction("Додати стовпець", self)
+        add_col_action.triggered.connect(self.add_col)
+        del_col_action = QAction("Видалити стовпець", self)
+        del_col_action.triggered.connect(self.delete_col)
         edit_menu.addAction(add_row_action)
-
-        remove_row_action = QAction("Видалити рядок", self)
-        remove_row_action.triggered.connect(self.remove_row)
-        edit_menu.addAction(remove_row_action)
-
-        add_col_action = QAction("Додати стовпчик", self)
-        add_col_action.triggered.connect(self.add_column)
+        edit_menu.addAction(del_row_action)
         edit_menu.addAction(add_col_action)
+        edit_menu.addAction(del_col_action)
 
-        remove_col_action = QAction("Видалити стовпчик", self)
-        remove_col_action.triggered.connect(self.remove_column)
-        edit_menu.addAction(remove_col_action)
+        analysis_menu = menubar.addMenu("Аналіз даних")
+        analysis_action = QAction("Запустити аналіз", self)
+        analysis_action.triggered.connect(self.open_analysis)
+        analysis_menu.addAction(analysis_action)
 
-        # Аналіз
-        analysis_menu = menubar.addMenu("Аналіз")
-        analyze_action = QAction("Аналіз даних", self)
-        analyze_action.triggered.connect(self.open_analysis)
-        analysis_menu.addAction(analyze_action)
-
-        # Допомога
-        help_menu = menubar.addMenu("Допомога")
-        about_action = QAction("Про програму", self)
+        about_menu = menubar.addMenu("Про програму")
+        about_action = QAction("Інформація", self)
         about_action.triggered.connect(self.show_about)
-        help_menu.addAction(about_action)
+        about_menu.addAction(about_action)
 
-    # === Операції з таблицею ===
+        # Підтримка копіювання / вставки
+        self.table.installEventFilter(self)
+
+    # Додавання і видалення рядків / стовпців
     def add_row(self):
         self.table.insertRow(self.table.rowCount())
 
-    def remove_row(self):
+    def delete_row(self):
         if self.table.rowCount() > 0:
-            self.table.removeRow(self.table.rowCount() - 1)
+            self.table.removeRow(self.table.currentRow())
 
-    def add_column(self):
-        self.table.insertColumn(self.table.columnCount())
+    def add_col(self):
+        col = self.table.columnCount()
+        self.table.insertColumn(col)
+        self.table.setHorizontalHeaderItem(col, QTableWidgetItem(f"Стовпець {col+1}"))
 
-    def remove_column(self):
+    def delete_col(self):
         if self.table.columnCount() > 0:
-            self.table.removeColumn(self.table.columnCount() - 1)
+            self.table.removeColumn(self.table.currentColumn())
 
-    # === Робота з Excel ===
-    def load_from_excel(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Відкрити Excel", "", "Excel Files (*.xlsx *.xls)")
-        if path:
-            df = pd.read_excel(path)
-            self.table.setRowCount(df.shape[0])
-            self.table.setColumnCount(df.shape[1])
-            for i in range(df.shape[0]):
-                for j in range(df.shape[1]):
-                    self.table.setItem(i, j, QTableWidgetItem(str(df.iat[i, j])))
-
+    # Збереження в Excel
     def save_to_excel(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Зберегти Excel", "", "Excel Files (*.xlsx)")
+        path, _ = QFileDialog.getSaveFileName(self, "Зберегти файл", "", "Excel Files (*.xlsx)")
         if path:
             data = []
-            for i in range(self.table.rowCount()):
-                row = []
-                for j in range(self.table.columnCount()):
-                    item = self.table.item(i, j)
-                    row.append(item.text() if item else "")
-                data.append(row)
-            df = pd.DataFrame(data)
+            for row in range(self.table.rowCount()):
+                data.append([self.table.item(row, col).text() if self.table.item(row, col) else "" for col in range(self.table.columnCount())])
+            df = pd.DataFrame(data, columns=[self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())])
             df.to_excel(path, index=False)
 
-    # === Аналіз ===
+    # Завантаження з Excel
+    def load_from_excel(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Відкрити файл", "", "Excel Files (*.xlsx)")
+        if path:
+            df = pd.read_excel(path)
+            self.table.setColumnCount(len(df.columns))
+            self.table.setRowCount(len(df))
+            self.table.setHorizontalHeaderLabels(list(df.columns))
+            for i in range(len(df)):
+                for j in range(len(df.columns)):
+                    self.table.setItem(i, j, QTableWidgetItem(str(df.iat[i, j])))
+
+    # Запуск аналізу
     def open_analysis(self):
-        data = []
-        for i in range(self.table.rowCount()):
-            row = []
-            for j in range(self.table.columnCount()):
-                item = self.table.item(i, j)
-                row.append(item.text() if item else "")
-            data.append(row)
-        df = pd.DataFrame(data)
+        df = self.table_to_dataframe()
+        if df is None or df.empty:
+            QMessageBox.warning(self, "Помилка", "Таблиця пуста!")
+            return
         self.analysis_window = AnalysisWindow(df)
         self.analysis_window.show()
 
+    def table_to_dataframe(self):
+        data = []
+        for row in range(self.table.rowCount()):
+            row_data = []
+            for col in range(self.table.columnCount()):
+                item = self.table.item(row, col)
+                row_data.append(item.text() if item else "")
+            data.append(row_data)
+        df = pd.DataFrame(data, columns=[self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())])
+        return df
+
     def show_about(self):
-        self.about_window = AboutWindow()
-        self.about_window.exec_()
+        dlg = AboutDialog()
+        dlg.exec_()
+
+    # Події для Ctrl+C / Ctrl+V
+    def eventFilter(self, source, event):
+        if event.type() == event.KeyPress:
+            if event.matches(event.Copy):
+                self.copy_selection()
+                return True
+            elif event.matches(event.Paste):
+                self.paste_selection()
+                return True
+        return super().eventFilter(source, event)
+
+    def copy_selection(self):
+        selection = self.table.selectedRanges()
+        if selection:
+            s = ""
+            for r in range(selection[0].topRow(), selection[0].bottomRow() + 1):
+                row_data = []
+                for c in range(selection[0].leftColumn(), selection[0].rightColumn() + 1):
+                    item = self.table.item(r, c)
+                    row_data.append("" if item is None else item.text())
+                s += "\t".join(row_data) + "\n"
+            QApplication.clipboard().setText(s)
+
+    def paste_selection(self):
+        selection = self.table.selectedRanges()
+        if selection:
+            r = selection[0].topRow()
+            c = selection[0].leftColumn()
+            text = QApplication.clipboard().text()
+            rows = text.split("\n")
+            for i, row_data in enumerate(rows):
+                if row_data.strip() == "":
+                    continue
+                cols = row_data.split("\t")
+                for j, val in enumerate(cols):
+                    if r + i < self.table.rowCount() and c + j < self.table.columnCount():
+                        self.table.setItem(r + i, c + j, QTableWidgetItem(val))
 
 
 if __name__ == "__main__":
