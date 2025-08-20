@@ -1,73 +1,53 @@
-import sys
-import scipy.stats as stats
-import statsmodels.api as sm
-from statsmodels.formula.api import ols
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QPushButton, QCheckBox, QMessageBox
-)
-from export import export_to_word
+import pandas as pd
+from PyQt5.QtWidgets import QMessageBox
+from scipy import stats
+import matplotlib.pyplot as plt
+import seaborn as sns
+from export_word import export_to_word
 
+def run_analysis(table_widget):
+    # Зчитуємо дані з таблиці
+    rows = table_widget.rowCount()
+    cols = table_widget.columnCount()
+    headers = [table_widget.horizontalHeaderItem(i).text() for i in range(cols)]
+    data = []
 
-class AnalysisDialog(QDialog):
-    def __init__(self, df, parent=None):
-        super().__init__(parent)
-        self.df = df
-        self.setWindowTitle("Вибір аналізу")
-        self.setMinimumWidth(400)
+    for i in range(rows):
+        row_data = []
+        for j in range(cols):
+            item = table_widget.item(i, j)
+            try:
+                row_data.append(float(item.text()) if item else None)
+            except:
+                row_data.append(None)
+        data.append(row_data)
 
-        layout = QVBoxLayout()
-        self.label = QLabel("Автоматична перевірка даних на нормальність...")
-        layout.addWidget(self.label)
+    df = pd.DataFrame(data, columns=headers)
 
-        # перевірка нормальності Шапіро
-        try:
-            values = self.df.apply(pd.to_numeric, errors="coerce").dropna().values.flatten()
-            stat, p = stats.shapiro(values)
-            if p < 0.05:
-                QMessageBox.warning(self, "Ненормальний розподіл",
-                                    "Дані не відповідають нормальному розподілу!\n"
-                                    "Використовуйте непараметричні аналізи.")
-        except Exception as e:
-            QMessageBox.warning(self, "Помилка", f"Неможливо виконати перевірку: {e}")
+    # Автоматична перевірка на нормальність
+    normal_results = {}
+    for col in df.columns:
+        col_data = df[col].dropna()
+        if len(col_data) > 3:
+            stat, p = stats.shapiro(col_data)
+            normal_results[col] = (stat, p)
 
-        # список аналізів
-        self.checks = []
-        analyses = [
-            "Однофакторний дисперсійний",
-            "Двофакторний дисперсійний",
-            "Багатофакторний дисперсійний",
-            "Дисперсійний з повторними вимірюваннями",
-            "НІР05",
-            "Тест Данканa",
-            "Тест Тьюкі",
-            "Тест Бонфероні",
-            "Сила впливу факторів",
-            "Квадратичне відхилення",
-            "Візуалізація результатів"
-        ]
-        for a in analyses:
-            cb = QCheckBox(a)
-            layout.addWidget(cb)
-            self.checks.append(cb)
-
-        # кнопка виконання
-        run_btn = QPushButton("Виконати аналіз")
-        run_btn.clicked.connect(self.run_analysis)
-        layout.addWidget(run_btn)
-
-        self.setLayout(layout)
-
-    def run_analysis(self):
-        selected = [cb.text() for cb in self.checks if cb.isChecked()]
-        if not selected:
-            QMessageBox.warning(self, "Помилка", "Оберіть хоча б один аналіз")
+    # Якщо дані не нормальні → повідомлення
+    for col, (stat, p) in normal_results.items():
+        if p < 0.05:
+            QMessageBox.warning(None, "Перевірка нормальності", 
+                f"Дані у стовпчику '{col}' не відповідають нормальному розподілу (p={p:.3f}).\n"
+                f"Рекомендується використати непараметричні методи.")
             return
 
-        # тут вставимо виклики розрахунків (зараз простий шаблон)
-        results = {}
-        for method in selected:
-            results[method] = f"Результати методу: {method} (тут буде формула/таблиця)"
+    # Якщо нормальні → будуємо графік і експортуємо
+    plt.figure(figsize=(6,4))
+    sns.boxplot(data=df)
+    plt.title("Розподіл даних")
+    plt.savefig("graph.png")
+    plt.close()
 
-        export_to_word(self.df, results)
-        QMessageBox.information(self, "Готово", "Результати збережено у Word!")
-        self.close()
+    # Експорт у Word
+    export_to_word(df, "Результати аналізу", "од.", {"Нормальність": normal_results}, "graph.png")
+
+    QMessageBox.information(None, "Аналіз завершено", "Результати збережено у Word.")
