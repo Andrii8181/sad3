@@ -8,4 +8,4 @@ matplotlib
 seaborn
 openpyxl
 python-docx
-tk
+PyQt5
