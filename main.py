@@ -1,132 +1,117 @@
 import sys
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem, QAction, QFileDialog, QMessageBox
+from PyQt5.QtGui import QIcon
 import pandas as pd
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QAction, QFileDialog,
-    QMessageBox, QTableWidget, QTableWidgetItem, QMenu, QVBoxLayout, QWidget
-)
-from analysis import AnalysisDialog
+from analysis import run_analysis
+from about import show_about
 
-
-class MainWindow(QMainWindow):
+class SADApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("SAD – Статистичний аналіз даних")
-        self.setGeometry(200, 100, 1000, 600)
+        self.setWindowTitle("SAD - Статистичний аналіз даних")
+        self.setGeometry(100, 100, 900, 600)
+        self.setWindowIcon(QIcon("icon.ico"))
 
-        # таблиця для введення
-        self.table = QTableWidget(5, 5)  # початкова таблиця 5х5
+        # Таблиця з початковими даними
+        self.table = QTableWidget(self)
+        self.table.setRowCount(5)
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels([f"Колонка {i+1}" for i in range(5)])
         self.setCentralWidget(self.table)
 
-        # меню
+        # Меню
         menubar = self.menuBar()
 
+        # Файл
         file_menu = menubar.addMenu("Файл")
-        analysis_menu = menubar.addMenu("Аналіз даних")
-        about_menu = menubar.addMenu("Про програму")
+        load_action = QAction("Завантажити з Excel", self)
+        load_action.triggered.connect(self.load_excel)
+        file_menu.addAction(load_action)
 
-        # дії для Файл
-        open_action = QAction("Відкрити Excel", self)
-        open_action.triggered.connect(self.load_excel)
-        save_action = QAction("Зберегти у Excel", self)
+        save_action = QAction("Зберегти в Excel", self)
         save_action.triggered.connect(self.save_excel)
-        file_menu.addAction(open_action)
         file_menu.addAction(save_action)
 
-        # дії для редагування таблиці
-        edit_menu = menubar.addMenu("Редагувати таблицю")
-        add_row = QAction("Вставити рядок", self)
-        add_row.triggered.connect(self.add_row)
-        del_row = QAction("Видалити рядок", self)
-        del_row.triggered.connect(self.delete_row)
-        add_col = QAction("Вставити стовпчик", self)
-        add_col.triggered.connect(self.add_col)
-        del_col = QAction("Видалити стовпчик", self)
-        del_col.triggered.connect(self.delete_col)
-        edit_menu.addActions([add_row, del_row, add_col, del_col])
+        exit_action = QAction("Вихід", self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
 
-        # дія аналіз даних
-        run_analysis = QAction("Вибір аналізу", self)
-        run_analysis.triggered.connect(self.open_analysis_dialog)
-        analysis_menu.addAction(run_analysis)
+        # Редагування
+        edit_menu = menubar.addMenu("Редагування")
+        add_row_action = QAction("Додати рядок", self)
+        add_row_action.triggered.connect(self.add_row)
+        edit_menu.addAction(add_row_action)
 
-        # дія про програму
+        del_row_action = QAction("Видалити рядок", self)
+        del_row_action.triggered.connect(self.del_row)
+        edit_menu.addAction(del_row_action)
+
+        add_col_action = QAction("Додати стовпчик", self)
+        add_col_action.triggered.connect(self.add_col)
+        edit_menu.addAction(add_col_action)
+
+        del_col_action = QAction("Видалити стовпчик", self)
+        del_col_action.triggered.connect(self.del_col)
+        edit_menu.addAction(del_col_action)
+
+        # Аналіз
+        analysis_menu = menubar.addMenu("Аналіз даних")
+        run_analysis_action = QAction("Виконати аналіз", self)
+        run_analysis_action.triggered.connect(self.run_analysis)
+        analysis_menu.addAction(run_analysis_action)
+
+        # Про програму
+        about_menu = menubar.addMenu("Про програму")
         about_action = QAction("Інформація", self)
-        about_action.triggered.connect(self.show_about)
+        about_action.triggered.connect(show_about)
         about_menu.addAction(about_action)
 
-    # функції редагування
+    def load_excel(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Відкрити Excel", "", "Excel Files (*.xlsx *.xls)")
+        if path:
+            df = pd.read_excel(path)
+            self.table.setRowCount(len(df))
+            self.table.setColumnCount(len(df.columns))
+            self.table.setHorizontalHeaderLabels(df.columns)
+            for i in range(len(df)):
+                for j in range(len(df.columns)):
+                    self.table.setItem(i, j, QTableWidgetItem(str(df.iat[i, j])))
+
+    def save_excel(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Зберегти Excel", "", "Excel Files (*.xlsx)")
+        if path:
+            data = []
+            headers = [self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
+            for i in range(self.table.rowCount()):
+                row_data = []
+                for j in range(self.table.columnCount()):
+                    item = self.table.item(i, j)
+                    row_data.append(item.text() if item else "")
+                data.append(row_data)
+            df = pd.DataFrame(data, columns=headers)
+            df.to_excel(path, index=False)
+
     def add_row(self):
         self.table.insertRow(self.table.rowCount())
 
-    def delete_row(self):
+    def del_row(self):
         if self.table.rowCount() > 0:
             self.table.removeRow(self.table.currentRow())
 
     def add_col(self):
-        self.table.insertColumn(self.table.columnCount())
+        col = self.table.columnCount()
+        self.table.insertColumn(col)
+        self.table.setHorizontalHeaderItem(col, QTableWidgetItem(f"Колонка {col+1}"))
 
-    def delete_col(self):
+    def del_col(self):
         if self.table.columnCount() > 0:
             self.table.removeColumn(self.table.currentColumn())
 
-    # робота з Excel
-    def load_excel(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Відкрити файл", "", "Excel Files (*.xlsx)")
-        if path:
-            df = pd.read_excel(path)
-            self.set_table_from_df(df)
-
-    def save_excel(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Зберегти файл", "", "Excel Files (*.xlsx)")
-        if path:
-            df = self.get_df_from_table()
-            df.to_excel(path, index=False)
-
-    def set_table_from_df(self, df):
-        self.table.setRowCount(df.shape[0])
-        self.table.setColumnCount(df.shape[1])
-        self.table.setHorizontalHeaderLabels(df.columns)
-        for i in range(df.shape[0]):
-            for j in range(df.shape[1]):
-                self.table.setItem(i, j, QTableWidgetItem(str(df.iat[i, j])))
-
-    def get_df_from_table(self):
-        rows = self.table.rowCount()
-        cols = self.table.columnCount()
-        data = []
-        headers = []
-        for j in range(cols):
-            header = self.table.horizontalHeaderItem(j)
-            headers.append(header.text() if header else f"Колонка {j+1}")
-        for i in range(rows):
-            row = []
-            for j in range(cols):
-                item = self.table.item(i, j)
-                row.append(item.text() if item else "")
-            data.append(row)
-        return pd.DataFrame(data, columns=headers)
-
-    # відкриття діалогу аналізу
-    def open_analysis_dialog(self):
-        df = self.get_df_from_table()
-        if df.empty:
-            QMessageBox.warning(self, "Помилка", "Таблиця порожня!")
-            return
-        dlg = AnalysisDialog(df, self)
-        dlg.exec_()
-
-    def show_about(self):
-        QMessageBox.information(
-            self,
-            "Про програму",
-            "SAD – Статистичний аналіз даних\n\nРозробник: Чаплоуцький А.М.\n"
-            "Кафедра плодівництва і виноградарства УНУ\n"
-            "© Усі права захищено, 2025"
-        )
-
+    def run_analysis(self):
+        run_analysis(self.table)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = SADApp()
     window.show()
     sys.exit(app.exec_())
