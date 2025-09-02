@@ -1,18 +1,15 @@
-name: Build and Release SAD
+name: build-windows
 
 on:
   push:
     tags:
-      - "v*.*.*"
-  workflow_dispatch:
+      - "v*"
 
 jobs:
-  build-windows:
+  build:
     runs-on: windows-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -20,24 +17,13 @@ jobs:
           python-version: "3.10"
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+        run: pip install -r requirements.txt pyinstaller
 
       - name: Build EXE
-        run: |
-          pyinstaller --noconsole --onefile --icon=icon.ico main.py --name "SAD"
+        run: pyinstaller --noconfirm --onefile --windowed --icon=icon.ico main.py
 
-      - name: Upload EXE artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SAD-windows
-          path: dist/SAD.exe
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/SAD.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: dist/main.exe
