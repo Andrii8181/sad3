@@ -1,11 +1,1 @@
-pandas
-numpy
-scipy
-statsmodels
-pingouin
-scikit_posthocs
-matplotlib
-seaborn
-openpyxl
-python-docx
 PyQt5
